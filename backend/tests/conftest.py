@@ -3,6 +3,7 @@
 import os
 
 os.environ["RECOVER_RUNS_ON_STARTUP"] = "false"  # tests must never resume real lesson runs
+os.environ["DEMO_FLAW_MODE"] = "off"  # before app settings load: demo mode never leaks into tests
 import time
 import uuid
 from collections.abc import Callable, Iterator
@@ -204,7 +205,3 @@ def make_user(db_session: Session, make_auth_user: Callable[..., uuid.UUID]) -> 
         return user_id
 
     return _make
-
-import os as _demo_os
-
-_demo_os.environ["DEMO_FLAW_MODE"] = "off"  # demo mode never leaks into tests
