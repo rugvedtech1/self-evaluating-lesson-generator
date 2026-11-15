@@ -7,7 +7,7 @@
 | **Live app** | https://self-evaluating-leappn-generator-acksh7hcp6pokvvytgxrfr.streamlit.app/ |
 | **API health** | https://lesson-generator-api.onrender.com/health |
 | **Sample lesson (approved by the evaluator)** | [docs/lesson-intro-to-rag.md](docs/lesson-intro-to-rag.md) |
-| **Demo video** | _Loom link_ |
+| **Demo video** | _Coming soon (recording in progress)_ |
 
 > Free hosting: the backend sleeps after 15 minutes without traffic, so the first request can take about a minute.
 
