@@ -204,3 +204,7 @@ def make_user(db_session: Session, make_auth_user: Callable[..., uuid.UUID]) -> 
         return user_id
 
     return _make
+
+import os as _demo_os
+
+_demo_os.environ["DEMO_FLAW_MODE"] = "off"  # demo mode never leaks into tests

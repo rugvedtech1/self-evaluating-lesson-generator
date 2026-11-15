@@ -11,6 +11,7 @@ from app.db.session import DatabaseNotConfiguredError, session_scope
 from app.evaluator.engine import LessonEvaluator
 from app.evaluator.llm import LangChainLessonJudge
 from app.generator.llm import LangChainLessonGenerator
+from app.workflows.demo import DemoFlawGenerator
 from app.llm.factory import build_chat_model
 from app.workflows.checkpointer import create_checkpointer_pool
 from app.workflows.lesson_graph import LessonWorkflowDeps, build_lesson_graph
@@ -30,8 +31,10 @@ def get_lesson_runner() -> LessonWorkflowRunner:
             settings = get_settings()
             if settings.database_url is None:
                 raise DatabaseNotConfiguredError("DATABASE_URL is not set. Add it to your .env file.")
-            generator = LangChainLessonGenerator(
-                build_chat_model("generator", temperature=0.4, max_tokens=settings.generator_max_tokens))
+            generator = DemoFlawGenerator(
+                LangChainLessonGenerator(
+                    build_chat_model("generator", temperature=0.4, max_tokens=settings.generator_max_tokens)),
+                mode=settings.demo_flaw_mode, case_key=settings.demo_flaw_case)
             evaluator = LessonEvaluator(LangChainLessonJudge(
                 build_chat_model("evaluator", temperature=0, max_tokens=settings.evaluator_max_tokens)))
             pool = create_checkpointer_pool(settings.database_url.get_secret_value())

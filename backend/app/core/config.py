@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     recover_runs_on_startup: bool = False  # resume interrupted lesson runs when the API starts
     admin_emails: str = ""  # comma-separated; admins may run prompt evolution and rollback
     evolution_min_occurrences: int = 3  # a failure pattern is 'recurring' at this count
+    demo_flaw_mode: str = "off"  # off | first | all  (recording demos only; see app/workflows/demo.py)
+    demo_flaw_case: str = "unexplained_jargon"  # which evaluation-dataset flaw to inject
 
     @property
     def admin_email_set(self) -> set[str]:
