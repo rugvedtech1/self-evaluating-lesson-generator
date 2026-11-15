@@ -47,6 +47,7 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = 60.0
     llm_max_retries: int = 2
     generator_max_tokens: int = 4000  # caps lesson length and cost
+    evaluator_max_tokens: int = 3000  # caps evaluation report size and cost
 
     @property
     def supabase_auth_url(self) -> str | None:

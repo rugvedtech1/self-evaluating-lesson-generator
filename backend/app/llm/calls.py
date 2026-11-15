@@ -17,14 +17,19 @@ INVALID_RESPONSE = "The AI service returned an invalid response. Please try agai
 UNAVAILABLE = "The AI service is temporarily unavailable. Please try again."
 
 
+def _details(exc: Exception) -> dict[str, str]:
+    # Type + a short excerpt of the message: enough to diagnose, never the whole prompt.
+    return {"error_type": type(exc).__name__, "error": " ".join(str(exc).split())[:600]}
+
+
 def call_llm(fn: Callable[[], T]) -> T:
     try:
         return fn()
     except (ValidationError, OutputParserException) as exc:
-        logger.warning("LLM returned invalid output", extra={"context": {"error_type": type(exc).__name__}})
+        logger.warning("LLM returned invalid output", extra={"context": _details(exc)})
         raise LLMResponseError(INVALID_RESPONSE) from exc
     except Exception as exc:  # provider / network / quota / timeout: a technical failure
-        logger.warning("LLM call failed", extra={"context": {"error_type": type(exc).__name__}})
+        logger.warning("LLM call failed", extra={"context": _details(exc)})
         raise LLMUnavailableError(UNAVAILABLE) from exc
 
 
