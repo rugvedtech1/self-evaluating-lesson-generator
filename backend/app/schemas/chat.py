@@ -73,3 +73,41 @@ class ProfileConfirmation(BaseModel):
     chat: ChatSummary
     learner_profile: LearnerProfileOut
     assistant_message: MessageOut
+
+
+class LessonVersionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    attempt_number: int
+    content: str
+    change_summary: str | None
+    created_at: datetime
+
+
+class LessonRunOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    status: str
+    topic: str
+    topic_key: str | None
+    attempt_count: int
+    max_attempts: int
+    error_message: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class LessonRunDetail(LessonRunOut):
+    versions: list[LessonVersionOut]
+
+
+class ChatWithLesson(ChatDetail):
+    latest_run: LessonRunDetail | None
+
+
+class ConversationTurnWithRun(ConversationTurn):
+    lesson_run: LessonRunOut | None = None
+
+
+class ProfileConfirmationWithRun(ProfileConfirmation):
+    lesson_run: LessonRunOut | None = None

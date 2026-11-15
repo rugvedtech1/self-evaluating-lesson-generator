@@ -168,3 +168,15 @@ def test_send_message_posts_content_with_bearer_token() -> None:
     ChatApi(make_client(handler), lambda: Tokens("a", "r"), lambda t: None).send_message("chat-1", "Hello")
     assert seen == {"method": "POST", "path": "/chats/chat-1/messages",
                     "auth": "Bearer a", "body": {"content": "Hello"}}
+
+
+def test_start_lesson_posts_to_lesson_runs() -> None:
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(method=request.method, path=request.url.path)
+        return httpx.Response(202, json={"id": "run-1", "status": "running"})
+
+    result = ChatApi(make_client(handler), lambda: Tokens("a", "r"), lambda t: None).start_lesson("chat-1")
+    assert result["status"] == "running"
+    assert seen == {"method": "POST", "path": "/chats/chat-1/lesson-runs"}

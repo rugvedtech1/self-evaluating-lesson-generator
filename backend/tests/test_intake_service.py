@@ -168,3 +168,12 @@ def test_inferred_fields_are_not_asked_about(ctx) -> None:
     assert "technical_background" not in llm.asked_fields
     assert "ai_knowledge" not in llm.asked_fields
     assert result.assistant_message.payload == {"intake_field": "preferred_style"}
+
+
+def test_direct_answer_is_never_marked_inferred(ctx) -> None:
+    _, _, send, llm = ctx
+    llm.queue(topic="RAG")
+    send("RAG")                                  # assistant now asks about education_level
+    llm.queue(education_level="12th (inferred)")  # LLM wrongly labels a direct answer
+    result = send("12 th")
+    assert result.profile.education_level == "12th"

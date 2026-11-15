@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     evaluator_model: str = "gpt-4.1-mini"
     llm_timeout_seconds: float = 60.0
     llm_max_retries: int = 2
+    generator_max_tokens: int = 4000  # caps lesson length and cost
 
     @property
     def supabase_auth_url(self) -> str | None:

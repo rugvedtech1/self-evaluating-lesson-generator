@@ -44,6 +44,11 @@ def is_inferred(value: str | None) -> bool:
     return bool(value) and value.strip().lower().endswith(INFERRED_MARKER)
 
 
+def strip_inferred(value: str) -> str:
+    """Remove the trailing "(inferred)" marker."""
+    return value.strip()[: -len(INFERRED_MARKER)].strip() if is_inferred(value) else value
+
+
 def asked_field_counts(messages: Sequence[_MessageLike]) -> Counter[str]:
     return Counter(
         m.payload["intake_field"] for m in messages
@@ -144,6 +149,9 @@ class IntakeAssistant:
             transcript=transcript, latest_message=content,
         ))
         updates = clean_updates(extraction.updates.model_dump(), current)
+        asked = last_asked_field(history)
+        if asked in updates and is_inferred(updates[asked]):
+            updates[asked] = strip_inferred(updates[asked])  # a direct answer is a fact, not a guess
         merged = {**current, **updates}
 
         # 2) DECIDE (Python)

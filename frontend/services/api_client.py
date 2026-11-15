@@ -147,6 +147,9 @@ class ChatApi:
     def confirm_profile(self, chat_id: str) -> dict[str, Any]:
         return self._call("POST", f"/chats/{chat_id}/profile/confirm")
 
+    def start_lesson(self, chat_id: str) -> dict[str, Any]:
+        return self._call("POST", f"/chats/{chat_id}/lesson-runs")
+
     def delete_chat(self, chat_id: str) -> None:
         self._call("DELETE", f"/chats/{chat_id}")
 

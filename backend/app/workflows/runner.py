@@ -1,0 +1,73 @@
+"""Starting lesson runs (inside the HTTP request) and executing the workflow (in the background)."""
+
+import logging
+import uuid
+from collections.abc import Callable
+from contextlib import AbstractContextManager
+from typing import Any
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.exceptions import InvalidOperationError, NotFoundError
+from app.db.session import session_scope as default_session_scope
+from app.generator.prompts import DEFAULT_GENERATOR_INSTRUCTIONS
+from app.models import Chat, LessonRun
+from app.services import learner_profiles as profile_service
+from app.services import lessons as lesson_service
+from app.services.prompts import ensure_active_prompt
+from app.topics.registry import match_topic
+from app.workflows.lesson_graph import record_generation_failure
+
+logger = logging.getLogger(__name__)
+STARTABLE_CHAT_STATUSES = ("generating", "failed")
+NOT_CONFIRMED = "Confirm your learner profile before generating a lesson."
+
+
+def start_lesson_run(db: Session, user_id: uuid.UUID, chat_id: uuid.UUID) -> LessonRun:
+    """Validate and create a run. The chat row is locked so two clicks can't start two runs."""
+    chat = db.scalar(select(Chat).where(Chat.id == chat_id, Chat.user_id == user_id).with_for_update())
+    if chat is None:
+        raise NotFoundError("Chat not found.")
+    if chat.status not in STARTABLE_CHAT_STATUSES:
+        raise InvalidOperationError(NOT_CONFIRMED)
+    profile = profile_service.get_learner_profile(db, user_id, chat_id)
+    if profile is None or not profile.is_confirmed or not profile.topic:
+        raise InvalidOperationError(NOT_CONFIRMED)
+    latest = lesson_service.get_latest_lesson_run(db, user_id, chat_id)
+    if latest is not None and latest.status in lesson_service.ACTIVE_RUN_STATUSES:
+        raise InvalidOperationError("A lesson is already being generated for this chat.")
+
+    prompt = ensure_active_prompt(db, "generator", DEFAULT_GENERATOR_INSTRUCTIONS)
+    run = lesson_service.create_lesson_run(
+        db, user_id, chat_id, topic=profile.topic, topic_key=match_topic(profile.topic).key,
+        generator_prompt_version_id=prompt.id,
+    )
+    chat.status = "generating"
+    db.flush()
+    return run
+
+
+class LessonWorkflowRunner:
+    """Executes the compiled graph for one run. Called as a FastAPI background task."""
+
+    def __init__(self, graph: Any,
+                 session_scope: Callable[[], AbstractContextManager[Session]] = default_session_scope) -> None:
+        self._graph = graph
+        self._session_scope = session_scope
+
+    def run(self, run_id: uuid.UUID, user_id: uuid.UUID) -> None:
+        context = {"run_id": str(run_id)}
+        logger.info("Lesson workflow started", extra={"context": context})
+        try:
+            self._graph.invoke({"run_id": str(run_id), "user_id": str(user_id)},
+                               {"configurable": {"thread_id": str(run_id)}})
+            logger.info("Lesson workflow finished", extra={"context": context})
+        except Exception:
+            # Unexpected crash (bug, DB outage...): still a TECHNICAL failure, never a content verdict.
+            logger.exception("Lesson workflow crashed", extra={"context": context})
+            try:
+                with self._session_scope() as db:
+                    record_generation_failure(db, user_id, run_id, "Unexpected internal error.")
+            except Exception:
+                logger.exception("Could not record workflow failure", extra={"context": context})

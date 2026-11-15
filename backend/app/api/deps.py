@@ -1,5 +1,6 @@
 """Shared FastAPI dependencies: database session, auth client, current user, AI components."""
 
+import logging
 from functools import lru_cache
 from typing import Annotated
 
@@ -16,7 +17,10 @@ from app.intake.llm import LangChainIntakeLLM
 from app.intake.service import IntakeAssistant
 from app.llm.factory import build_chat_model
 from app.services.supabase_auth import SupabaseAuthClient
+from app.workflows import runtime as workflow_runtime
+from app.workflows.runner import LessonWorkflowRunner
 
+logger = logging.getLogger(__name__)
 _bearer_scheme = HTTPBearer(auto_error=False, description="Supabase access token")
 
 
@@ -100,9 +104,18 @@ def get_intake_assistant() -> IntakeAssistant:
         raise _service_unavailable(str(exc)) from exc
 
 
+def get_lesson_runner() -> LessonWorkflowRunner:
+    try:
+        return workflow_runtime.get_lesson_runner()
+    except Exception as exc:  # misconfiguration or checkpointer DB unreachable
+        logger.exception("Lesson workflow runtime unavailable")
+        raise _service_unavailable("Lesson generation is temporarily unavailable.") from exc
+
+
 # Convenient type aliases for route signatures
 DbSession = Annotated[Session, Depends(get_db)]
 AuthClient = Annotated[SupabaseAuthClient, Depends(get_auth_client)]
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 BearerToken = Annotated[str, Depends(get_bearer_token)]
 IntakeAssistantDep = Annotated[IntakeAssistant, Depends(get_intake_assistant)]
+LessonRunnerDep = Annotated[LessonWorkflowRunner, Depends(get_lesson_runner)]

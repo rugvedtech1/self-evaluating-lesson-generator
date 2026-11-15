@@ -24,6 +24,7 @@ def build_chat_model(
     component: Component,
     *,
     temperature: float | None = None,
+    max_tokens: int | None = None,
     settings: Settings | None = None,
 ) -> BaseChatModel:
     settings = settings or get_settings()
@@ -42,4 +43,6 @@ def build_chat_model(
     }
     if temperature is not None:
         kwargs["temperature"] = temperature
+    if max_tokens is not None:
+        kwargs["max_tokens"] = max_tokens
     return init_chat_model(model_name_for(component, settings), model_provider=provider, **kwargs)

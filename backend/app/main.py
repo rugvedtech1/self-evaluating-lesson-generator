@@ -15,6 +15,7 @@ from app.core.exceptions import (
     InvalidOperationError, LLMConfigurationError, LLMResponseError, LLMUnavailableError, NotFoundError,
 )
 from app.core.logging import configure_logging
+from app.workflows import runtime as workflow_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         logger.info("Application startup", extra={"context": {"environment": settings.app_env}})
         yield
+        workflow_runtime.shutdown()  # close the checkpointer connection pool
         logger.info("Application shutdown")
 
     app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)

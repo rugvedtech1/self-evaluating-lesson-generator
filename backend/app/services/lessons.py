@@ -6,9 +6,10 @@ This module guarantees that whatever it stores is owned, sequential and consiste
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import InvalidOperationError, NotFoundError
@@ -16,6 +17,7 @@ from app.models import Evaluation, LessonRun, LessonVersion
 from app.services.chats import get_chat
 
 FINISHED_RUN_STATUSES = frozenset({"approved", "rejected", "error"})
+ACTIVE_RUN_STATUSES = frozenset({"pending", "running"})
 
 
 @dataclass(frozen=True)
@@ -46,6 +48,9 @@ def create_lesson_run(
         generator_prompt_version_id=generator_prompt_version_id,
         evaluator_prompt_version_id=evaluator_prompt_version_id,
     )
+    # clock_timestamp(): distinct times even for runs created in one transaction ("latest" stays well defined)
+    run.created_at = func.clock_timestamp()
+    run.updated_at = func.clock_timestamp()
     db.add(run)
     db.flush()
     return run
@@ -67,6 +72,21 @@ def list_lesson_runs(db: Session, user_id: uuid.UUID, chat_id: uuid.UUID) -> lis
             .where(LessonRun.chat_id == chat_id, LessonRun.user_id == user_id)
             .order_by(LessonRun.created_at.desc()))
     return list(db.scalars(stmt))
+
+
+def get_latest_lesson_run(db: Session, user_id: uuid.UUID, chat_id: uuid.UUID) -> LessonRun | None:
+    runs = list_lesson_runs(db, user_id, chat_id)
+    return runs[0] if runs else None
+
+
+def mark_lesson_run_error(db: Session, user_id: uuid.UUID, run_id: uuid.UUID, error_message: str) -> LessonRun:
+    """A TECHNICAL failure (API down, crash). Never used for content-quality rejection."""
+    run = get_lesson_run(db, user_id, run_id, lock=True)
+    run.status = "error"
+    run.error_message = error_message[:1000]
+    run.completed_at = datetime.now(timezone.utc)
+    db.flush()
+    return run
 
 
 def add_lesson_version(
