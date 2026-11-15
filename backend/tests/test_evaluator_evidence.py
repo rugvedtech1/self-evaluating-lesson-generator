@@ -38,7 +38,12 @@ def test_quote_spanning_numbered_list_items_is_found() -> None:
     assert quote_in_lesson("Prepare: split the documents into chunks. Ask: a user types a question.", lesson)
 
 
-def test_one_invented_sentence_inside_a_real_quote_is_rejected() -> None:
+def test_quote_anchored_by_one_real_sentence_is_accepted() -> None:
+    lesson = normalise_text("RAG stands for Retrieval-Augmented Generation. It helps AI look things up.")
+    assert quote_in_lesson("RAG stands for Retrieval-Augmented Generation. It is a way to help computers answer "
+                           "questions using two main parts.", lesson)
+
+
+def test_quote_with_no_real_sentence_is_rejected() -> None:
     lesson = normalise_text("Retrieval simply means looking something up. It finds the most useful text.")
-    assert not quote_in_lesson("Retrieval simply means looking something up. RAG retrains the model every time.",
-                               lesson)
+    assert not quote_in_lesson("RAG retrains the model every time. It is always 100% accurate.", lesson)

@@ -1,6 +1,8 @@
 """Shared Pytest fixtures for backend tests."""
 
 import os
+
+os.environ["RECOVER_RUNS_ON_STARTUP"] = "false"  # tests must never resume real lesson runs
 import time
 import uuid
 from collections.abc import Callable, Iterator

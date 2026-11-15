@@ -9,8 +9,8 @@ from app.api.deps import CurrentUser, DbSession, IntakeAssistantDep, LessonRunne
 from app.intake import service as intake_service
 from app.models import Chat, ChatProfile, Message
 from app.schemas.chat import (
-    ChatCreate, ChatSummary, ChatUpdate, ChatWithLesson, ConversationTurnWithRun, LearnerProfileOut,
-    LessonRunDetail, LessonRunOut, LessonVersionOut, MessageCreate, MessageOut, ProfileConfirmationWithRun,
+    AttemptOut, ChatCreate, ChatSummary, ChatUpdate, ChatWithLesson, ConversationTurnWithRun, EvaluationOut,
+    LearnerProfileOut, LessonRunDetail, LessonRunOut, MessageCreate, MessageOut, ProfileConfirmationWithRun,
 )
 from app.services import chats as chat_service
 from app.services import learner_profiles as profile_service
@@ -30,10 +30,19 @@ def _latest_run(db: Session, user_id: uuid.UUID, chat_id: uuid.UUID) -> LessonRu
     if run is None:
         return None
     history = lesson_service.get_lesson_run_history(db, user_id, run.id)
-    return LessonRunDetail(
-        **LessonRunOut.model_validate(run).model_dump(),
-        versions=[LessonVersionOut.model_validate(a.version) for a in history.attempts],
-    )
+    attempts = [
+        AttemptOut(
+            id=a.version.id, attempt_number=a.version.attempt_number, content=a.version.content,
+            change_summary=a.version.change_summary, generator_feedback=a.version.generator_feedback,
+            created_at=a.version.created_at,
+            evaluation=EvaluationOut.model_validate(a.evaluation) if a.evaluation else None,
+        )
+        for a in history.attempts
+    ]
+    evaluated = sum(1 for a in attempts if a.evaluation is not None)
+    phase, current = lesson_service.run_phase(run.status, len(attempts), evaluated, run.max_attempts)
+    return LessonRunDetail(**LessonRunOut.model_validate(run).model_dump(),
+                           phase=phase, current_attempt=current, attempts=attempts)
 
 
 def _start_generation(db: Session, user_id: uuid.UUID, chat_id: uuid.UUID,
@@ -117,5 +126,5 @@ def confirm_profile(chat_id: uuid.UUID, user: CurrentUser, db: DbSession, runner
 @router.post("/{chat_id}/lesson-runs", response_model=LessonRunOut, status_code=status.HTTP_202_ACCEPTED)
 def start_lesson(chat_id: uuid.UUID, user: CurrentUser, db: DbSession, runner: LessonRunnerDep,
                  background: BackgroundTasks) -> LessonRunOut:
-    """Start (or, after a technical failure, retry) lesson generation. 202 = accepted, runs in background."""
+    """Start a new run: after a technical error or a rejection. 202 = accepted, runs in the background."""
     return _start_generation(db, user.id, chat_id, background, runner)

@@ -35,9 +35,12 @@ def _parts(quote: str) -> list[str]:
 
 
 def quote_in_lesson(quote: str, lesson_normalised: str) -> bool:
-    """True if every meaningful part of the quote appears in the lesson."""
-    parts = _parts(quote)
-    return bool(parts) and all(_found(p, lesson_normalised) for p in parts)
+    """True if the quote is ANCHORED in the lesson: at least one meaningful sentence really appears in it.
+
+    Fully invented evidence is still rejected; a real sentence followed by a paraphrase is tolerated
+    (live runs showed models often paraphrase the tail of a quote).
+    """
+    return any(_found(p, lesson_normalised) for p in _parts(quote))
 
 
 def verified_quotes(quotes: Iterable[str], lesson_markdown: str) -> list[str]:

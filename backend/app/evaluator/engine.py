@@ -109,7 +109,7 @@ class LessonEvaluator:
     """Bounded retry: an INVALID judge response is retried (max_attempts total); provider outages are not
     (the client already retried them). Either way, failure here is TECHNICAL, never a lesson verdict."""
 
-    def __init__(self, judge: LessonJudge, max_attempts: int = 2) -> None:
+    def __init__(self, judge: LessonJudge, max_attempts: int = 3) -> None:
         self._judge = judge
         self._max_attempts = max_attempts
 

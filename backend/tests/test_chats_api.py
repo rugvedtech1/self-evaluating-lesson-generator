@@ -177,15 +177,22 @@ def test_start_lesson_rejected_while_one_is_running(api, alice, fake_intake_llm)
     assert "already" in response.json()["detail"]
 
 
-def test_chat_detail_includes_latest_run_and_lesson(api, alice, alice_id, fake_intake_llm, db_session) -> None:
+def test_chat_detail_includes_attempts_evaluations_and_phase(api, alice, alice_id, fake_intake_llm,
+                                                             db_session) -> None:
     chat_id = _confirmed_chat(api, alice, fake_intake_llm)
-    run_id = api.post(f"/chats/{chat_id}/profile/confirm", headers=alice).json()["lesson_run"]["id"]
-    lesson_svc.add_lesson_version(db_session, alice_id, uuid.UUID(run_id), content="# Lesson\n\nHello")
+    run_id = uuid.UUID(api.post(f"/chats/{chat_id}/profile/confirm", headers=alice).json()["lesson_run"]["id"])
+    version = lesson_svc.add_lesson_version(db_session, alice_id, run_id, content="# Lesson\n\nHello")
+    lesson_svc.add_evaluation(db_session, alice_id, version.id, overall_status="FAIL",
+                              criteria_results=[{"criterion": "jargon_explanation", "status": "FAIL"}],
+                              failed_criteria=["jargon_explanation"], feedback_for_generator="Explain embeddings.")
 
     run = api.get(f"/chats/{chat_id}", headers=alice).json()["latest_run"]
-    assert run["id"] == run_id
-    assert [v["attempt_number"] for v in run["versions"]] == [1]
-    assert run["versions"][0]["content"].startswith("# Lesson")
+    assert run["id"] == str(run_id)
+    assert (run["phase"], run["current_attempt"]) == ("improving", 2)
+    attempt = run["attempts"][0]
+    assert attempt["attempt_number"] == 1 and attempt["content"].startswith("# Lesson")
+    assert attempt["evaluation"]["failed_criteria"] == ["jargon_explanation"]
+    assert attempt["evaluation"]["feedback_for_generator"] == "Explain embeddings."
 
 
 def test_llm_outage_returns_503_and_saves_nothing(api, alice, fake_intake_llm) -> None:

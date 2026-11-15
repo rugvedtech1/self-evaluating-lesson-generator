@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     generator_max_tokens: int = 4000  # caps lesson length and cost
     evaluator_max_tokens: int = 3000  # caps evaluation report size and cost
+    recover_runs_on_startup: bool = False  # resume interrupted lesson runs when the API starts
 
     @property
     def supabase_auth_url(self) -> str | None:

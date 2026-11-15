@@ -97,8 +97,31 @@ class LessonRunOut(BaseModel):
     completed_at: datetime | None
 
 
+class EvaluationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    overall_status: str
+    failed_criteria: list[str]
+    feedback_for_generator: str | None
+    criteria_results: list[dict[str, Any]]
+    created_at: datetime
+
+
+class AttemptOut(BaseModel):
+    """One row of the rejection log: a version, what it was asked to fix, what changed, and its verdict."""
+
+    id: uuid.UUID
+    attempt_number: int
+    content: str
+    change_summary: str | None
+    generator_feedback: str | None
+    created_at: datetime
+    evaluation: EvaluationOut | None
+
+
 class LessonRunDetail(LessonRunOut):
-    versions: list[LessonVersionOut]
+    phase: str            # writing | evaluating | improving | approved | rejected | error
+    current_attempt: int
+    attempts: list[AttemptOut]
 
 
 class ChatWithLesson(ChatDetail):

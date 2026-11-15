@@ -1,7 +1,7 @@
 """Storage for lesson runs, lesson versions and evaluation reports.
 
-The Python Decision Gate (Step 6) decides WHEN to generate, approve or reject.
-This module guarantees that whatever it stores is owned, sequential and consistent.
+The Python Decision Gate decides WHEN to generate, approve or reject.
+This module guarantees that whatever it stores is owned, sequential, consistent and replay-safe.
 """
 
 import uuid
@@ -32,6 +32,17 @@ class LessonRunHistory:
     attempts: list[AttemptRecord]
 
 
+def run_phase(status: str, versions: int, evaluations: int, max_attempts: int) -> tuple[str, int]:
+    """What the learner should see now, derived from stored data: (phase, current attempt)."""
+    if status in FINISHED_RUN_STATUSES:
+        return status, versions
+    if versions == 0:
+        return "writing", 1
+    if versions > evaluations:
+        return "evaluating", versions
+    return "improving", min(versions + 1, max_attempts)
+
+
 def create_lesson_run(
     db: Session,
     user_id: uuid.UUID,
@@ -59,7 +70,7 @@ def create_lesson_run(
 def get_lesson_run(db: Session, user_id: uuid.UUID, run_id: uuid.UUID, *, lock: bool = False) -> LessonRun:
     stmt = select(LessonRun).where(LessonRun.id == run_id, LessonRun.user_id == user_id)
     if lock:
-        stmt = stmt.with_for_update()  # serialise concurrent attempts on the same run
+        stmt = stmt.with_for_update()  # serialise concurrent writers on the same run
     run = db.scalar(stmt)
     if run is None:
         raise NotFoundError("Lesson run not found.")
@@ -80,13 +91,37 @@ def get_latest_lesson_run(db: Session, user_id: uuid.UUID, chat_id: uuid.UUID) -
 
 
 def mark_lesson_run_error(db: Session, user_id: uuid.UUID, run_id: uuid.UUID, error_message: str) -> LessonRun:
-    """A TECHNICAL failure (API down, crash). Never used for content-quality rejection."""
+    """A TECHNICAL failure (API down, crash). Never used for content-quality rejection. Idempotent."""
     run = get_lesson_run(db, user_id, run_id, lock=True)
+    if run.status in FINISHED_RUN_STATUSES:
+        return run
     run.status = "error"
     run.error_message = error_message[:1000]
     run.completed_at = datetime.now(timezone.utc)
     db.flush()
     return run
+
+
+def finish_lesson_run(db: Session, user_id: uuid.UUID, run_id: uuid.UUID, *, status: str,
+                      final_attempt_number: int) -> tuple[LessonRun, bool]:
+    """Record the Decision Gate's final outcome. Returns (run, changed) so replays don't repeat side effects."""
+    if status not in ("approved", "rejected"):
+        raise ValueError("A run can only finish as 'approved' or 'rejected'.")
+    run = get_lesson_run(db, user_id, run_id, lock=True)
+    if run.status in FINISHED_RUN_STATUSES:
+        return run, False
+    run.status = status
+    run.final_attempt_number = final_attempt_number
+    run.completed_at = datetime.now(timezone.utc)
+    db.flush()
+    return run, True
+
+
+def get_version_by_attempt(db: Session, user_id: uuid.UUID, run_id: uuid.UUID,
+                           attempt_number: int) -> LessonVersion | None:
+    return db.scalar(select(LessonVersion).where(
+        LessonVersion.run_id == run_id, LessonVersion.user_id == user_id,
+        LessonVersion.attempt_number == attempt_number))
 
 
 def add_lesson_version(
@@ -97,15 +132,22 @@ def add_lesson_version(
     content: str,
     generator_feedback: str | None = None,
     change_summary: str | None = None,
+    expected_attempt: int | None = None,
 ) -> LessonVersion:
-    """Store the next attempt. Attempt numbers are assigned here, never by the caller."""
+    """Store the next attempt. With expected_attempt, a replay after a crash returns the existing version."""
     run = get_lesson_run(db, user_id, run_id, lock=True)
+    if expected_attempt is not None and run.attempt_count >= expected_attempt:
+        existing = get_version_by_attempt(db, user_id, run_id, expected_attempt)
+        if existing is not None:
+            return existing
     if run.status in FINISHED_RUN_STATUSES:
         raise InvalidOperationError("Lesson run is already finished.")
     if run.attempt_count >= run.max_attempts:
         raise InvalidOperationError("Maximum generation attempts reached.")
 
     attempt_number = run.attempt_count + 1
+    if expected_attempt is not None and expected_attempt != attempt_number:
+        raise InvalidOperationError("Attempt numbers must be sequential.")
     version = LessonVersion(
         run_id=run.id, user_id=user_id, attempt_number=attempt_number, content=content,
         generator_feedback=generator_feedback, change_summary=change_summary,
@@ -130,6 +172,9 @@ def add_evaluation(
                                                     LessonVersion.user_id == user_id))
     if version is None:
         raise NotFoundError("Lesson version not found.")
+    existing = db.scalar(select(Evaluation).where(Evaluation.lesson_version_id == version.id))
+    if existing is not None:
+        return existing  # replay after a crash: already stored
     if overall_status not in ("PASS", "FAIL"):
         raise ValueError("overall_status must be PASS or FAIL.")
     # No partial credit: PASS means zero failures; FAIL means at least one.

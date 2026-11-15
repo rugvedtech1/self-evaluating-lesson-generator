@@ -59,3 +59,20 @@ def test_other_users_chat_is_not_found(db_session, confirmed, make_user) -> None
     _, chat = confirmed
     with pytest.raises(NotFoundError):
         start_lesson_run(db_session, make_user(), chat.id)
+
+
+def test_new_run_allowed_after_rejection(db_session, confirmed) -> None:
+    user, chat = confirmed
+    first = start_lesson_run(db_session, user, chat.id)
+    lesson_svc.finish_lesson_run(db_session, user, first.id, status="rejected", final_attempt_number=3)
+    chat.status = "completed"
+    assert start_lesson_run(db_session, user, chat.id).id != first.id
+
+
+def test_no_new_run_after_approval(db_session, confirmed) -> None:
+    user, chat = confirmed
+    first = start_lesson_run(db_session, user, chat.id)
+    lesson_svc.finish_lesson_run(db_session, user, first.id, status="approved", final_attempt_number=1)
+    chat.status = "completed"
+    with pytest.raises(InvalidOperationError, match="approved"):
+        start_lesson_run(db_session, user, chat.id)

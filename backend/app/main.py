@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import logging
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -34,6 +35,9 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         logger.info("Application startup", extra={"context": {"environment": settings.app_env}})
+        if settings.recover_runs_on_startup:
+            threading.Thread(target=workflow_runtime.recover_in_background,
+                             name="lesson-run-recovery", daemon=True).start()
         yield
         workflow_runtime.shutdown()  # close the checkpointer connection pool
         logger.info("Application shutdown")
