@@ -1,13 +1,14 @@
-"""Streamlit entry point: the login screen, or the chat application."""
+"""Streamlit entry point: the login screen, the chat application, or the system learning page."""
 
 import streamlit as st
 
 from components.auth import render_auth_page
 from components.chat import render_chat
 from components.sidebar import render_sidebar
+from components.system import render_system
 from services.api_client import ApiError, BackendClient, ChatApi, SessionExpiredError
 from services.settings import get_frontend_settings
-from state import end_session, get_tokens, save_tokens
+from state import current_view, end_session, get_tokens, save_tokens
 
 st.set_page_config(page_title="Lesson Generator", page_icon="📘", layout="centered")
 
@@ -28,7 +29,10 @@ def main() -> None:
     api = ChatApi(client, get_tokens, save_tokens)
     try:
         render_sidebar(api)
-        render_chat(api)
+        if current_view() == "system":
+            render_system(api)
+        else:
+            render_chat(api)
     except SessionExpiredError as exc:
         end_session(exc.message)
         st.rerun()

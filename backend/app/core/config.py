@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     generator_max_tokens: int = 4000  # caps lesson length and cost
     evaluator_max_tokens: int = 3000  # caps evaluation report size and cost
     recover_runs_on_startup: bool = False  # resume interrupted lesson runs when the API starts
+    admin_emails: str = ""  # comma-separated; admins may run prompt evolution and rollback
+    evolution_min_occurrences: int = 3  # a failure pattern is 'recurring' at this count
+
+    @property
+    def admin_email_set(self) -> set[str]:
+        return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
 
     @property
     def supabase_auth_url(self) -> str | None:

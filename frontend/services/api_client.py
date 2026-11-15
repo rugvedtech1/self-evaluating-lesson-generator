@@ -150,6 +150,18 @@ class ChatApi:
     def start_lesson(self, chat_id: str) -> dict[str, Any]:
         return self._call("POST", f"/chats/{chat_id}/lesson-runs")
 
+    def list_prompts(self, component: str = "generator") -> list[dict[str, Any]]:
+        return self._call("GET", f"/system/prompts/{component}")
+
+    def list_failure_patterns(self) -> list[dict[str, Any]]:
+        return self._call("GET", "/system/failure-patterns")
+
+    def start_evolution(self) -> dict[str, Any]:
+        return self._call("POST", "/system/evolve")
+
+    def rollback_prompt(self, component: str = "generator", to_version: int | None = None) -> dict[str, Any]:
+        return self._call("POST", f"/system/prompts/{component}/rollback", json={"to_version": to_version})
+
     def delete_chat(self, chat_id: str) -> None:
         self._call("DELETE", f"/chats/{chat_id}")
 

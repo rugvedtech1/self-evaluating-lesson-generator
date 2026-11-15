@@ -49,3 +49,14 @@ def set_flash(message: str) -> None:
 
 def pop_flash() -> str | None:
     return st.session_state.pop(_FLASH, None)
+
+
+_VIEW = "current_view"
+
+
+def current_view() -> str:
+    return st.session_state.get(_VIEW, "chat")
+
+
+def set_view(view: str) -> None:
+    st.session_state[_VIEW] = view

@@ -180,3 +180,14 @@ def test_start_lesson_posts_to_lesson_runs() -> None:
     result = ChatApi(make_client(handler), lambda: Tokens("a", "r"), lambda t: None).start_lesson("chat-1")
     assert result["status"] == "running"
     assert seen == {"method": "POST", "path": "/chats/chat-1/lesson-runs"}
+
+
+def test_start_evolution_posts_to_system_endpoint() -> None:
+    seen: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.update(method=request.method, path=request.url.path)
+        return httpx.Response(202, json={"status": "started", "message": "ok"})
+
+    ChatApi(make_client(handler), lambda: Tokens("a", "r"), lambda t: None).start_evolution()
+    assert seen == {"method": "POST", "path": "/system/evolve"}

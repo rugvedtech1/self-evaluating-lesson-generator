@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from app.api.auth import router as auth_router
 from app.api.chats import router as chats_router
 from app.api.health import router as health_router
+from app.api.system import router as system_router
 from app.core.config import get_settings
 from app.core.exceptions import (
     InvalidOperationError, LLMConfigurationError, LLMResponseError, LLMUnavailableError, NotFoundError,
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(chats_router)
+    app.include_router(system_router)
     return app
 
 

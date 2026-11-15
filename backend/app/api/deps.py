@@ -17,6 +17,8 @@ from app.intake.llm import LangChainIntakeLLM
 from app.intake.service import IntakeAssistant
 from app.llm.factory import build_chat_model
 from app.services.supabase_auth import SupabaseAuthClient
+from app.evolution import runtime as evolution_runtime
+from app.evolution.runtime import EvolutionService
 from app.workflows import runtime as workflow_runtime
 from app.workflows.runner import LessonWorkflowRunner
 
@@ -112,6 +114,18 @@ def get_lesson_runner() -> LessonWorkflowRunner:
         raise _service_unavailable("Lesson generation is temporarily unavailable.") from exc
 
 
+# ------------------------------------------------------------------ administration
+def get_admin_user(user: Annotated[AuthenticatedUser, Depends(get_current_user)]) -> AuthenticatedUser:
+    """Admins are listed by email in ADMIN_EMAILS (from the verified token, never from the client)."""
+    if not user.email or user.email.lower() not in get_settings().admin_email_set:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Only administrators can change system prompts.")
+    return user
+
+
+def get_evolution_service() -> EvolutionService:
+    return evolution_runtime.get_evolution_service()
+
+
 # Convenient type aliases for route signatures
 DbSession = Annotated[Session, Depends(get_db)]
 AuthClient = Annotated[SupabaseAuthClient, Depends(get_auth_client)]
@@ -119,3 +133,5 @@ CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 BearerToken = Annotated[str, Depends(get_bearer_token)]
 IntakeAssistantDep = Annotated[IntakeAssistant, Depends(get_intake_assistant)]
 LessonRunnerDep = Annotated[LessonWorkflowRunner, Depends(get_lesson_runner)]
+AdminUser = Annotated[AuthenticatedUser, Depends(get_admin_user)]
+EvolutionServiceDep = Annotated[EvolutionService, Depends(get_evolution_service)]
