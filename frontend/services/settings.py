@@ -17,7 +17,7 @@ class FrontendSettings(BaseSettings):
     )
 
     backend_url: str = "http://localhost:8000"
-    request_timeout_seconds: float = 10.0
+    request_timeout_seconds: float = 60.0  # chat requests wait for the LLM
 
 
 @lru_cache

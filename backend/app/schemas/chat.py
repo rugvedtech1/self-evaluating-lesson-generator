@@ -58,3 +58,18 @@ class ChatDetail(BaseModel):
     chat: ChatSummary
     messages: list[MessageOut]
     learner_profile: LearnerProfileOut | None
+
+
+class ConversationTurn(BaseModel):
+    """Result of sending one message: what was saved and how the chat changed."""
+
+    user_message: MessageOut
+    assistant_message: MessageOut
+    chat: ChatSummary
+    learner_profile: LearnerProfileOut | None
+
+
+class ProfileConfirmation(BaseModel):
+    chat: ChatSummary
+    learner_profile: LearnerProfileOut
+    assistant_message: MessageOut

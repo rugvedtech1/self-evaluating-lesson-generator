@@ -33,3 +33,19 @@ class NotFoundError(Exception):
 
 class InvalidOperationError(Exception):
     """Request conflicts with the resource's current state  -> HTTP 409."""
+
+
+class LLMError(Exception):
+    """A TECHNICAL problem talking to the language model. Never a content-quality verdict."""
+
+
+class LLMConfigurationError(LLMError):
+    """Provider, model or API key not configured  -> HTTP 503."""
+
+
+class LLMUnavailableError(LLMError):
+    """Provider unreachable, timed out, rate-limited or out of quota  -> HTTP 503."""
+
+
+class LLMResponseError(LLMError):
+    """Provider answered, but the output failed validation  -> HTTP 502."""

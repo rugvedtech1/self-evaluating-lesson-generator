@@ -20,3 +20,9 @@ email-validator==2.4.0
 # Workflow orchestration + durable state
 langgraph==1.2.22
 langgraph-checkpoint-postgres==3.2.1
+
+# LLM integration (provider-independent interface + OpenAI provider)
+langchain==1.5.0
+langchain-core==1.8.0
+langchain-openai==1.8.0
+openai==3.51.0

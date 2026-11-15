@@ -13,4 +13,5 @@ pythonpath = ["backend", "frontend"]
 addopts = "-ra --import-mode=importlib"
 markers = [
     "db: needs the local Docker test database (TEST_DATABASE_URL); skipped if unavailable",
+    "live: calls the real LLM API (costs credits); skipped unless RUN_LIVE_LLM_TESTS=1",
 ]

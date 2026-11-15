@@ -1,4 +1,4 @@
-"""Shared FastAPI dependencies: database session, auth client, current user."""
+"""Shared FastAPI dependencies: database session, auth client, current user, AI components."""
 
 from functools import lru_cache
 from typing import Annotated
@@ -9,9 +9,12 @@ from jwt import PyJWKClient
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.exceptions import AuthServiceUnavailableError, TokenValidationError
+from app.core.exceptions import AuthServiceUnavailableError, LLMConfigurationError, TokenValidationError
 from app.core.security import AuthenticatedUser, TokenVerifier
 from app.db.session import get_db
+from app.intake.llm import LangChainIntakeLLM
+from app.intake.service import IntakeAssistant
+from app.llm.factory import build_chat_model
 from app.services.supabase_auth import SupabaseAuthClient
 
 _bearer_scheme = HTTPBearer(auto_error=False, description="Supabase access token")
@@ -84,8 +87,22 @@ def get_current_user(
         raise _service_unavailable(str(exc)) from exc
 
 
+# ------------------------------------------------------------------ AI components
+@lru_cache
+def _build_intake_assistant() -> IntakeAssistant:
+    return IntakeAssistant(LangChainIntakeLLM(build_chat_model("intake", temperature=0.3)))
+
+
+def get_intake_assistant() -> IntakeAssistant:
+    try:
+        return _build_intake_assistant()
+    except LLMConfigurationError as exc:
+        raise _service_unavailable(str(exc)) from exc
+
+
 # Convenient type aliases for route signatures
 DbSession = Annotated[Session, Depends(get_db)]
 AuthClient = Annotated[SupabaseAuthClient, Depends(get_auth_client)]
 CurrentUser = Annotated[AuthenticatedUser, Depends(get_current_user)]
 BearerToken = Annotated[str, Depends(get_bearer_token)]
+IntakeAssistantDep = Annotated[IntakeAssistant, Depends(get_intake_assistant)]

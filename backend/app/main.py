@@ -11,18 +11,18 @@ from app.api.auth import router as auth_router
 from app.api.chats import router as chats_router
 from app.api.health import router as health_router
 from app.core.config import get_settings
-from app.core.exceptions import InvalidOperationError, NotFoundError
+from app.core.exceptions import (
+    InvalidOperationError, LLMConfigurationError, LLMResponseError, LLMUnavailableError, NotFoundError,
+)
 from app.core.logging import configure_logging
 
 logger = logging.getLogger(__name__)
 
 
-async def _not_found_handler(_: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"detail": str(exc)})
-
-
-async def _conflict_handler(_: Request, exc: Exception) -> JSONResponse:
-    return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": str(exc)})
+def _handler(status_code: int):
+    async def handle(_: Request, exc: Exception) -> JSONResponse:
+        return JSONResponse(status_code=status_code, content={"detail": str(exc)})
+    return handle
 
 
 def create_app() -> FastAPI:
@@ -37,8 +37,12 @@ def create_app() -> FastAPI:
         logger.info("Application shutdown")
 
     app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
-    app.add_exception_handler(NotFoundError, _not_found_handler)
-    app.add_exception_handler(InvalidOperationError, _conflict_handler)
+    app.add_exception_handler(NotFoundError, _handler(status.HTTP_404_NOT_FOUND))
+    app.add_exception_handler(InvalidOperationError, _handler(status.HTTP_409_CONFLICT))
+    # LLM problems are technical failures (503/502), never content verdicts.
+    app.add_exception_handler(LLMUnavailableError, _handler(status.HTTP_503_SERVICE_UNAVAILABLE))
+    app.add_exception_handler(LLMConfigurationError, _handler(status.HTTP_503_SERVICE_UNAVAILABLE))
+    app.add_exception_handler(LLMResponseError, _handler(status.HTTP_502_BAD_GATEWAY))
     app.include_router(health_router)
     app.include_router(auth_router)
     app.include_router(chats_router)

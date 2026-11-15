@@ -1,31 +1,39 @@
-"""Streamlit entry point. Step 1: verify the frontend can reach the backend."""
+"""Streamlit entry point: the login screen, or the chat application."""
 
 import streamlit as st
 
-from services.api_client import BackendClient
+from components.auth import render_auth_page
+from components.chat import render_chat
+from components.sidebar import render_sidebar
+from services.api_client import ApiError, BackendClient, ChatApi, SessionExpiredError
 from services.settings import get_frontend_settings
+from state import end_session, get_tokens, save_tokens
 
-st.set_page_config(page_title="Lesson Content Generator", page_icon="📘", layout="centered")
+st.set_page_config(page_title="Lesson Generator", page_icon="📘", layout="centered")
 
 
 @st.cache_resource
 def get_backend_client() -> BackendClient:
-    """Create one HTTP client and reuse it across Streamlit reruns."""
+    """One HTTP client, reused across Streamlit reruns."""
     settings = get_frontend_settings()
     return BackendClient(base_url=settings.backend_url, timeout=settings.request_timeout_seconds)
 
 
-st.title("📘 Self-Evaluating Lesson Generator")
-st.caption("Step 1 skeleton — login, chat and lesson generation arrive in later steps.")
+def main() -> None:
+    client = get_backend_client()
+    if get_tokens() is None:
+        render_auth_page(client)
+        return
 
-st.subheader("Backend connection")
-status = get_backend_client().check_health()
+    api = ChatApi(client, get_tokens, save_tokens)
+    try:
+        render_sidebar(api)
+        render_chat(api)
+    except SessionExpiredError as exc:
+        end_session(exc.message)
+        st.rerun()
+    except ApiError as exc:
+        st.error(exc.message)
 
-if status.ok:
-    st.success(status.detail)
-    st.json(status.payload)
-else:
-    st.error(status.detail)
-    st.info("Start the backend in another terminal, then click the button below.")
 
-st.button("Check again")  # any button click re-runs the script
+main()

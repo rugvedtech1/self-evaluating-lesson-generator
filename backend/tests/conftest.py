@@ -4,6 +4,7 @@ import os
 import time
 import uuid
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
@@ -20,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import PROJECT_ROOT, get_settings
 from app.core.security import TokenVerifier
+from app.intake.schemas import ExtractionRequest, ProfileExtraction, ProfileUpdates, QuestionRequest
 from app.main import create_app
 from app.models import Profile
 
@@ -35,6 +37,37 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     with TestClient(create_app()) as test_client:
         yield test_client
     get_settings.cache_clear()
+
+
+# ------------------------------------------------------------- fake LLM
+@dataclass
+class FakeIntakeLLM:
+    """Deterministic stand-in for the LLM: returns queued extractions, records what it was asked."""
+
+    extractions: list[ProfileExtraction] = field(default_factory=list)
+    asked_fields: list[str] = field(default_factory=list)
+    extract_error: Exception | None = None
+    ask_error: Exception | None = None
+
+    def queue(self, confirms: bool = False, **updates: str) -> "FakeIntakeLLM":
+        self.extractions.append(ProfileExtraction(updates=ProfileUpdates(**updates), confirms_profile=confirms))
+        return self
+
+    def extract(self, request: ExtractionRequest) -> ProfileExtraction:
+        if self.extract_error is not None:
+            raise self.extract_error
+        return self.extractions.pop(0) if self.extractions else ProfileExtraction()
+
+    def ask(self, request: QuestionRequest) -> str:
+        if self.ask_error is not None:
+            raise self.ask_error
+        self.asked_fields.append(request.field.name)
+        return f"Could you tell me about your {request.field.label.lower()}?"
+
+
+@pytest.fixture
+def fake_intake_llm() -> FakeIntakeLLM:
+    return FakeIntakeLLM()
 
 
 # ------------------------------------------------------------- JWT test keys

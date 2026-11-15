@@ -38,6 +38,15 @@ class Settings(BaseSettings):
     jwt_audience: str = "authenticated"
     auth_request_timeout_seconds: float = 10.0
 
+    # LLM: provider and models are configuration, not code
+    llm_provider: str = "openai"
+    openai_api_key: SecretStr | None = None
+    intake_model: str = "gpt-4o-mini"
+    generator_model: str = "gpt-4.1-mini"
+    evaluator_model: str = "gpt-4.1-mini"
+    llm_timeout_seconds: float = 60.0
+    llm_max_retries: int = 2
+
     @property
     def supabase_auth_url(self) -> str | None:
         """Base URL of Supabase Auth; also the expected JWT issuer (`iss` claim)."""

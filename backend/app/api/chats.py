@@ -4,16 +4,22 @@ import uuid
 
 from fastapi import APIRouter, Response, status
 
-from app.api.deps import CurrentUser, DbSession
-from app.models import Chat, Message
+from app.api.deps import CurrentUser, DbSession, IntakeAssistantDep
+from app.intake import service as intake_service
+from app.models import Chat, ChatProfile, Message
 from app.schemas.chat import (
-    ChatCreate, ChatDetail, ChatSummary, ChatUpdate, LearnerProfileOut, MessageCreate, MessageOut,
+    ChatCreate, ChatDetail, ChatSummary, ChatUpdate, ConversationTurn, LearnerProfileOut,
+    MessageCreate, MessageOut, ProfileConfirmation,
 )
 from app.services import chats as chat_service
 from app.services import learner_profiles as profile_service
 from app.services.profiles import ensure_profile
 
 router = APIRouter(prefix="/chats", tags=["chats"])
+
+
+def _profile_out(profile: ChatProfile | None) -> LearnerProfileOut | None:
+    return LearnerProfileOut.model_validate(profile) if profile else None
 
 
 @router.post("", response_model=ChatSummary, status_code=status.HTTP_201_CREATED)
@@ -35,7 +41,7 @@ def get_chat(chat_id: uuid.UUID, user: CurrentUser, db: DbSession) -> ChatDetail
     return ChatDetail(
         chat=ChatSummary.model_validate(chat),
         messages=[MessageOut.model_validate(m) for m in messages],
-        learner_profile=LearnerProfileOut.model_validate(profile) if profile else None,
+        learner_profile=_profile_out(profile),
     )
 
 
@@ -55,7 +61,25 @@ def list_messages(chat_id: uuid.UUID, user: CurrentUser, db: DbSession) -> list[
     return chat_service.list_messages(db, user.id, chat_id)
 
 
-@router.post("/{chat_id}/messages", response_model=MessageOut, status_code=status.HTTP_201_CREATED)
-def post_message(chat_id: uuid.UUID, body: MessageCreate, user: CurrentUser, db: DbSession) -> Message:
-    # Clients may only speak as "user"; assistant messages come from our AI components.
-    return chat_service.add_message(db, user.id, chat_id, role="user", content=body.content)
+@router.post("/{chat_id}/messages", response_model=ConversationTurn, status_code=status.HTTP_201_CREATED)
+def post_message(
+    chat_id: uuid.UUID, body: MessageCreate, user: CurrentUser, db: DbSession, intake: IntakeAssistantDep
+) -> ConversationTurn:
+    """Save the learner's message and let the Intake Assistant reply (clients only speak as 'user')."""
+    result = intake.handle_user_message(db, user.id, chat_id, body.content)
+    return ConversationTurn(
+        user_message=MessageOut.model_validate(result.user_message),
+        assistant_message=MessageOut.model_validate(result.assistant_message),
+        chat=ChatSummary.model_validate(result.chat),
+        learner_profile=_profile_out(result.profile),
+    )
+
+
+@router.post("/{chat_id}/profile/confirm", response_model=ProfileConfirmation)
+def confirm_profile(chat_id: uuid.UUID, user: CurrentUser, db: DbSession) -> ProfileConfirmation:
+    result = intake_service.confirm_profile(db, user.id, chat_id)
+    return ProfileConfirmation(
+        chat=ChatSummary.model_validate(result.chat),
+        learner_profile=LearnerProfileOut.model_validate(result.profile),
+        assistant_message=MessageOut.model_validate(result.assistant_message),
+    )
