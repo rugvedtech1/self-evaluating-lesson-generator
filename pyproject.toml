@@ -1,0 +1,13 @@
+[project]
+name = "lesson-content-generator"
+version = "0.1.0"
+description = "Self-evaluating lesson content generator (GenAI Engineer take-home)."
+requires-python = ">=3.12"
+# Dependencies live in backend/requirements.txt and frontend/requirements.txt
+# so the two services can be deployed independently.
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["backend/tests", "frontend/tests"]
+pythonpath = ["backend", "frontend"]
+addopts = "-ra --import-mode=importlib"

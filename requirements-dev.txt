@@ -1,0 +1,6 @@
+# Local development: everything + testing tools
+-r backend/requirements.txt
+-r frontend/requirements.txt
+pytest==9.2.0
+httpx==0.28.1
+httpx2==2.16.0
