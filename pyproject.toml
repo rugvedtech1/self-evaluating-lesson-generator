@@ -11,3 +11,6 @@ minversion = "8.0"
 testpaths = ["backend/tests", "frontend/tests"]
 pythonpath = ["backend", "frontend"]
 addopts = "-ra --import-mode=importlib"
+markers = [
+    "db: needs the local Docker test database (TEST_DATABASE_URL); skipped if unavailable",
+]

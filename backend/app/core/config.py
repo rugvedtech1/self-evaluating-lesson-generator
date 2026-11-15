@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py -> parents: [0]=core, [1]=app, [2]=backend, [3]=project root
@@ -14,18 +15,35 @@ class Settings(BaseSettings):
     """Typed, validated backend configuration.
 
     Priority: real environment variables > .env file > defaults below.
+    Secrets use SecretStr so they are masked if the object is ever printed or logged.
     """
 
     model_config = SettingsConfigDict(
         env_file=PROJECT_ROOT / ".env",
         env_file_encoding="utf-8",
-        extra="ignore",  # .env also holds frontend variables; ignore them here
+        extra="ignore",  # .env also holds frontend/test variables; ignore them here
     )
 
     app_name: str = "Lesson Content Generator API"
     app_version: str = "0.1.0"
     app_env: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
+
+    # Supabase (optional at import time; required by the features that use them)
+    supabase_url: str | None = None
+    supabase_publishable_key: SecretStr | None = None
+    database_url: SecretStr | None = None
+
+    # Authentication
+    jwt_audience: str = "authenticated"
+    auth_request_timeout_seconds: float = 10.0
+
+    @property
+    def supabase_auth_url(self) -> str | None:
+        """Base URL of Supabase Auth; also the expected JWT issuer (`iss` claim)."""
+        if not self.supabase_url:
+            return None
+        return f"{self.supabase_url.rstrip('/')}/auth/v1"
 
 
 @lru_cache
